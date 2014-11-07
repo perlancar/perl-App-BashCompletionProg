@@ -8,10 +8,14 @@ use strict;
 use warnings;
 
 use File::Slurp::Tiny qw();
+use File::Which;
 use List::Util qw(first);
 use Perinci::Object;
 use Perinci::Sub::Util qw(err);
+use String::ShellQuote;
 use Text::Fragment qw();
+
+my $ME = "bash-completion-prog";
 
 our %SPEC;
 
@@ -47,12 +51,37 @@ sub _write_f {
 }
 
 # XXX plugin based
-sub _detect_prog {
+sub _detect_file {
+    my ($prog, $path) = @_;
+    say "D:detecting $prog ($path)";
+    open my($fh), "<", $path or return [500, "Can't open: $!"];
+    read $fh, my($buf), 2;
+    my $is_script = $buf eq '#!';
+
+    # currently we don't support non-scripts at all
+    return [200, "OK", 0] if !$is_script;
+
+    my $is_perl_script = <$fh> =~ /perl/;
+    seek $fh, 0, 0;
+    my $content = do { local $/; ~~<$fh> };
+
+    if ($content =~
+            /^\s*# FRAGMENT id=bash-completion-prog-hints command=(.+)$/m) {
+        return [200, "OK", 1, {
+            "func.command"=>"complete -C ".shell_quote($1)." $prog"}];
+    } elsif ($is_perl_script && $content =~
+                 /^\s*(use|require)\s+Perinci::CmdLine(::Any|::Lite)?/m) {
+        return [200, "OK", 1, {
+            "func.command"=>"complete -C $prog $prog"}];
+    }
+    [200, "OK", 0];
 }
 
 # add one or more programs
 sub _add {
     my %args = @_;
+
+    use DD; dd \%args;
 
     my $readres = _read_parse_f($args{file});
     return err("Can't read entries", $readres) if $readres->[0] != 200;
@@ -61,33 +90,64 @@ sub _add {
 
     my $content = $readres->[2]{content};
 
+    my $added;
     my $envres = envresmulti();
   PROG:
-    for my $prog0 (@{ $args{_progs} }) {
-        my $prog = $prog0; $prog =~ s!.+/!!:
+    for my $prog0 (@{ $args{progs} }) {
+        my $path;
+        say "D:prog0=$prog0\n";
+        if ($prog0 =~ m!/!) {
+            $path = $prog0;
+            unless (-f $path) {
+                warn "$ME: No such file '$path', skipped\n";
+                $envres->add_result(404, "No such file", {item_id=>$prog0});
+                next PROG;
+            }
+        } else {
+            $path = which($prog0);
+            unless ($path) {
+                warn "$ME: '$prog0' not found in PATH, skipped\n";
+                $envres->add_result(404, "Not in PATH", {item_id=>$prog0});
+                next PROG;
+            }
+        }
+        my $prog = $prog0; $prog =~ s!.+/!!;
+        my $detectres = _detect_file($prog, $path);
+        if ($detectres->[0] != 200) {
+            warn "$ME: Can't detect '$prog': $detectres->[1]\n";
+            $envres->add_result($detectres->[0], $detectres->[1],
+                                {item_id=>$prog0});
+            next PROG;
+        }
+        if (!$detectres->[2]) {
+            # we simply ignore undetected programs
+            next PROG;
+        }
+
         if ($args{ignore}) {
-            if ($existing_progs{ $prog }) {
+            if ($existing_progs{$prog}) {
                 say "Entry already exists in $readres->[2]{path}: ".
                     "$prog, skipped";
                 next PROG;
             } else {
-                say "Adding entry to $readres->[2]{path}: $prog->{name}";
+                say "Adding entry to $readres->[2]{path}: $prog";
             }
         } else {
-            if ($existing_progs{ $prog->{name} }) {
+            if ($existing_progs{$prog}) {
                 warn "Entry already exists in $readres->[2]{path}: ".
-                    "$prog->{name}, replacing\n" unless $args{replace};
+                    "$prog, replacing\n" unless $args{replace};
             } else {
-                say "Adding entry to $readres->[2]{path}: $prog->{name}";
+                say "Adding entry to $readres->[2]{path}: $prog";
             }
         }
 
         my $insres = Text::Fragment::insert_fragment(
-            text=>$content, id=>$prog->{name},
-            payload=>$prog->{command});
+            text=>$content, id=>$prog,
+            payload=>$detectres->[3]{'func.command'});
         $envres->add_result($insres->[0], $insres->[1],
-                            {item_id=>$prog->{name}});
+                            {item_id=>$prog0});
         next unless $insres->[0] == 200;
+        $added++;
         $content = $insres->[2]{text};
     }
 
@@ -99,24 +159,10 @@ sub _add {
     $envres->as_struct;
 }
 
-    } elsif ($opts->{progs}) {
-        for my $prog (@{ $opts->{progs} }) {
-            $prog =~ s!.+/!!;
-            $names{$prog} and next;
-            push @progs, {prog=>$prog, compprog=>$prog};
-            $added++;
-            $names{$prog}++;
-        }
-    } else {
-        die "BUG: no progs or dirs given";
-    }
-
-}
-
 sub _delete {
     my %args = @_;
     my $readres = _read_parse_f($args{file});
-    return err("Can't read entries", $res) if $readres->[0] != 200;
+    return err("Can't read entries", $readres) if $readres->[0] != 200;
 
     my $envres = envresmulti();
 
@@ -171,54 +217,24 @@ sub _list {
     [200, "OK", \@res];
 }
 
-$SPEC{clean_entries} = {
-    v => 1.1,
-    summary => 'Delete entries for commands that are not in PATH',
-    description => <<'_',
-
-Sometimes when a program gets uninstalled, it still leaves completion entry.
-This subcommand will search all entries for commands that are no longer found in
-PATH and remove them.
-
-_
-    args => {
-        %arg_file,
-    },
-};
-sub clean_entries {
+sub _clean {
     require File::Which;
 
     my %args = @_;
-    _delete_entries(
-        {criteria => sub {
-             my $names = shift;
-             # remove if none of the names in complete command are in PATH
-             for my $name (@{ $names }) {
-                 if (File::Which::which($name)) {
-                     return 0;
-                 }
-             }
-             return 1;
-         }},
+    _delete(
+        criteria => sub {
+            my $names = shift;
+            # remove if none of the names in complete command are in PATH
+            for my $name (@{ $names }) {
+                if (File::Which::which($name)) {
+                    return 0;
+                }
+            }
+            return 1;
+        },
         %args,
     );
 }
 
-$SPEC{add_all_pc} = {
-    v => 1.1,
-    summary => 'Find all scripts that use Perinci::CmdLine in specified dirs (or PATH)' .
-        ' and add completion entries for them',
-    description => <<'_',
-_
-    args => {
-        %arg_file,
-        %arg_dir,
-    },
-};
-sub add_all_pc {
-    my %args = @_;
-    _add_pc({dirs => delete($args{dir}) // [split /:/, $ENV{PATH}]}, %args);
-}
-
 1;
-# ABSTRACT: Backend for bash-completion-f script
+# ABSTRACT: Backend for bash-completion-prog script

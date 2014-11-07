@@ -18,7 +18,7 @@ sub _all_exec_in_PATH {
         opendir my($dh), $dir or next;
         for my $f (readdir $dh) {
             next if $f eq '.' || $f eq '..';
-            next unless -x $f;
+            next unless ((-f "$dir/$f") && (-x _));
             push @res, "$dir/$f";
         }
     }
@@ -78,6 +78,7 @@ sub prog {
     } elsif ($action eq 'list') {
         return App::BashCompletionProg::_list(
             file   => $args{file},
+            detail => $args{detail},
         );
     } elsif ($action eq 'remove') {
         return [400, "Please specify one or more programs"] unless $args;
@@ -91,21 +92,6 @@ sub prog {
             criteria => sub {1},
         );
     }
-
-    my $compprog;
-    my $detectres =
-        Perinci::CmdLine::Util::detect_perinci_cmdline_script(
-            script=>"$dir/$prog",
-            include_noexec=>0,
-            include_wrapper=>1);
-    $detectres->[0] == 200 or
-        do { warn "Can't detect $prog: $detectres->[1], skipped"; next };
-                $detectres->[2] or
-                    do { say "DEBUG:Skipping $prog (".$detectres->[3]{'func.reason'}.")" if $DEBUG; next };
-                if ($detectres->[3]{'func.is_wrapper'}) {
-                    $compprog = $detectres->[3]{'func.wrapped'};
-                }
-
 }
 
 Perinci::CmdLine::Any->new(url => '/main/prog')->run;
@@ -148,7 +134,7 @@ commands for programs that it recognizes. Currently it recognizes:
 
 You can put this in a script, e.g. in a script called C<foo>:
 
- # FRAGMENT id=bash-completion-prog-hints complete_program=bar
+ # FRAGMENT id=bash-completion-prog-hints command=bar
 
 The above line tells C<bash-completion-prog> that the script should be completed
 using an external program called C<bar>. This will add this line to
@@ -168,7 +154,9 @@ line:
 
  complete -C foo foo # FRAGMENT id=foo
 
-Note: this is the original reason why C<bash-completion-prog> came into being.
+Note: this is the original reason why C<bash-completion-prog> came into being:
+to easily add completion for Perinci::CmdLine-based scripts, which I write a
+lot.
 
 =item * Other methods
 
