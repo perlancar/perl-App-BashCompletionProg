@@ -53,10 +53,10 @@ _
         detail => {
             schema => 'bool*',
         },
-        ignore => {
-            schema => 'str*',
+        replace => {
+            schema => 'bool*',
         },
-        args => {
+       args => {
             schema => ['array*' => of => 'str*'],
             pos    => 0,
             greedy => 1,
@@ -72,13 +72,18 @@ sub prog {
     if ($action eq 'add') {
         $args = _all_exec_in_PATH() unless $args;
         return App::BashCompletionProg::_add(
-            file   => $args{file},
-            progs  => $args{args},
+            file    => $args{file},
+            progs   => $args,
+            replace => $args{replace},
         );
     } elsif ($action eq 'list') {
         return App::BashCompletionProg::_list(
             file   => $args{file},
             detail => $args{detail},
+        );
+    } elsif ($action eq 'clean') {
+        return App::BashCompletionProg::_clean(
+            file     => $args{file},
         );
     } elsif ($action eq 'remove') {
         return [400, "Please specify one or more programs"] unless $args;
@@ -94,7 +99,10 @@ sub prog {
     }
 }
 
-Perinci::CmdLine::Any->new(url => '/main/prog')->run;
+Perinci::CmdLine::Any->new(
+    url => '/main/prog',
+    log => 1,
+)->run;
 
 # ABSTRACT: Add appropriate bash completion command for a program
 # PODNAME: bash-completion-prog
@@ -201,7 +209,9 @@ C</>) will be searched in C<PATH>:
 
  % bash-completion-prog foo ./bar/baz
 
-If a program's completion cannot be determined, it will simply be ignored.
+If a program's completion cannot be determined, it will simply be ignored. If a
+program's completion command is already listed, it will also be ignored, unless
+C<--replace> is specified.
 
 
 =head1 COMMAND-LINE OPTIONS
@@ -218,22 +228,20 @@ List all programs which are listed in the C<bash-completion-prog> file.
 
 =head2 --remove
 
+Remove all programs in C<bash-completion-prog> file that are not in C<PATH>.
+
+=head2 --remove
+
 Remove specified programs from C<bash-completion-prog> file.
 
 =head2 --remove-all
 
 Remove all entries in C<bash-completion-prog> file.
 
-=head2 --ignore, -i
-
-When adding a program that already exists in C<bash-completion-prog> file,
-ignore and don't replace it.
-
 =head2 --replace
 
 When adding a program that already exists in C<bash-completion-prog> file,
-replace it without warning. The default behavior (without C<--replace> or
-C<--ignore>) is to replace but with a warning.
+replace it without warning. The default behavior is to ignore the program.
 
 
 =head1 ENVIRONMENT
