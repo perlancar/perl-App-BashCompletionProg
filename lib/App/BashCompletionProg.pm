@@ -69,6 +69,15 @@ sub _detect_file {
             "func.command"=>"complete -C ".shell_quote($1)." $qprog",
             "func.note"=>"hint",
         }];
+    } elsif ($content =~
+            /^\s*# FRAGMENT id=bash-completion-prog-hints completer=1 for=(.+?)\s*$/m) {
+        return [200, "OK", 1, {
+            "func.command"=>join(
+                "; ",
+                map {"complete -C $qprog ".shell_quote($_)} split(',',$1)
+            ),
+            "func.note"=>"hint(completer)",
+        }];
     } elsif ($is_perl_script && $content =~
                  /^\s*(use|require)\s+(Perinci::CmdLine(?:::Any|::Lite)?)\b/m) {
         return [200, "OK", 1, {
