@@ -138,7 +138,7 @@ commands for programs that it recognizes. Currently it recognizes:
 
 =over
 
-=item * Scripts which are tagged with hints
+=item * Scripts which are tagged with hints of what completion program to use
 
 You can put this in a script, e.g. in a script called C<foo>:
 
@@ -152,6 +152,31 @@ C</etc/bash-completion-prog> (or C<~/.bash-completion-prog>):
 
 Ignore the C<# FRAGMENT ...> or C<# BEGIN FRAGMENT ... # END FRAGMENT> part, it
 is just used to aid in adding or removing the fragment.
+
+=item * Getopt::Long::Complete-based CLI scripts
+
+If a script like C<foo> is detected as a Perl script using
+L<Getopt::Long::Complete>, we know that it can complete itself. Thus,
+C<bash-completion-prog> will add this line:
+
+ complete -C foo foo # FRAGMENT id=foo
+
+=item * Completion scripts which are tagged with hints of what scripts they complete
+
+You can create a completion script in Perl (or other language, actually), e.g.
+C<_foo> and tag it with hints of what scripts they complete, e.g.
+
+ # FRAGMENT id=bash-completion-prog-hints completer=1 for=foo,foo-this-host
+
+This will add this entry to C<bash-completion-prog> file:
+
+ # BEGIN FRAGMENT id=_foo
+ complete -C _foo foo
+ complete -C _foo foo-this-host
+ # END FRAGMENT id=_foo
+
+For an example of completer scripts, see C<App::BashCompleter::*> modules like
+C<App::BashCompleter::cpanm>.
 
 =item * Perinci::CmdLine-based CLI scripts
 
