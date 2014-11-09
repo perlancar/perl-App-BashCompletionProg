@@ -62,14 +62,25 @@ sub _detect_file {
     seek $fh, 0, 0;
     my $content = do { local $/; ~~<$fh> };
 
+    my $qprog = shell_quote($prog);
     if ($content =~
             /^\s*# FRAGMENT id=bash-completion-prog-hints command=(.+?)\s*$/m) {
         return [200, "OK", 1, {
-            "func.command"=>"complete -C ".shell_quote($1)." $prog"}];
+            "func.command"=>"complete -C ".shell_quote($1)." $qprog",
+            "func.note"=>"hint",
+        }];
     } elsif ($is_perl_script && $content =~
-                 /^\s*(use|require)\s+Perinci::CmdLine(::Any|::Lite)?/m) {
+                 /^\s*(use|require)\s+(Perinci::CmdLine(?:::Any|::Lite)?)\b/m) {
         return [200, "OK", 1, {
-            "func.command"=>"complete -C $prog $prog"}];
+            "func.command"=>"complete -C $qprog $qprog",
+            "func.note"=>$2,
+        }];
+    } elsif ($is_perl_script && $content =~
+                 /^\s*(use|require)\s+(Getopt::Long::Complete)\b/m) {
+        return [200, "OK", 1, {
+            "func.command"=>"complete -C $qprog $qprog",
+            "func.note"=>$2,
+        }];
     }
     [200, "OK", 0];
 }
