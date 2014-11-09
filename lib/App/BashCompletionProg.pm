@@ -152,7 +152,8 @@ sub _add {
 
         my $insres = Text::Fragment::insert_fragment(
             text=>$content, id=>$prog,
-            payload=>$detectres->[3]{'func.command'});
+            payload=>$detectres->[3]{'func.command'},
+            ((attrs=>{note=>$detectres->[3]{'func.note'}}) x !!$detectres->[3]{'func.note'}));
         $envres->add_result($insres->[0], $insres->[1],
                             {item_id=>$prog0});
         next if $insres->[0] == 304;
@@ -220,7 +221,7 @@ sub _list {
     my @res;
     for (@{ $res->[2]{parsed} }) {
         if ($args{detail}) {
-            push @res, {id=>$_->{id}, payload=>$_->{payload}};
+            push @res, {id=>$_->{id}, payload=>$_->{payload}, note=>$_->{attrs}{note}};
         } else {
             push @res, $_->{id};
         }
