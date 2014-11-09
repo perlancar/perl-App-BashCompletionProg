@@ -1,5 +1,14 @@
 Revision history for App-BashCompletionProg
 
+0.02    2014-11-09 (PERLANCAR)
+
+        - Add support for Getopt::Long::Complete-based scripts.
+
+        - Add support for hints for completer scripts on which programs they complete.
+
+        - Add/show note.
+
+
 0.01    2014-11-07 (PERLANCAR)
 
         - First release, previous incantation is App-BashCompletionF; this one
