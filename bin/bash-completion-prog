@@ -239,7 +239,7 @@ program's completion command is already listed, it will also be ignored, unless
 C<--replace> is specified.
 
 
-=head1 COMMAND-LINE OPTIONS
+=head1 OPTIONS
 
 =head2 --file, -f
 
