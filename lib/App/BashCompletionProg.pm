@@ -134,7 +134,7 @@ sub _add {
                                 {item_id=>$prog0});
             next PROG;
         }
-        $log->debugf("Detection result %s: %s", $prog, $detectres);
+        $log->debugf("Detection result for '%s': %s", $prog, $detectres);
         if (!$detectres->[2]) {
             # we simply ignore undetected programs
             next PROG;
