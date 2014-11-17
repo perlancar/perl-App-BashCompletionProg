@@ -18,6 +18,7 @@ sub _all_exec_in_PATH {
         opendir my($dh), $dir or next;
         for my $f (readdir $dh) {
             next if $f eq '.' || $f eq '..';
+            next if $f =~ /~\z/; # skip backup files
             next unless ((-f "$dir/$f") && (-x _));
             push @res, "$dir/$f";
         }
