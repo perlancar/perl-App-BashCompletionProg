@@ -2,6 +2,7 @@
 
 # DATE
 # VERSION
+# FRAGMENT id=bash-completion-prog-nohint
 
 use 5.010;
 use strict;

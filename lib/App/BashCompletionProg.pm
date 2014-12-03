@@ -64,13 +64,15 @@ sub _detect_file {
 
     my $qprog = shell_quote($prog);
     if ($content =~
-            /^\s*# FRAGMENT id=bash-completion-prog-hints command=(.+?)\s*$/m) {
+            /^\s*# FRAGMENT id=bash-completion-prog-hints command=(.+?)\s*$/m
+                && $content !~ /^\s*# FRAGMENT id=bash-completion-prog-nohint\s*$/m) {
         return [200, "OK", 1, {
             "func.command"=>"complete -C ".shell_quote($1)." $qprog",
             "func.note"=>"hint",
         }];
     } elsif ($content =~
-            /^\s*# FRAGMENT id=bash-completion-prog-hints completer=1 for=(.+?)\s*$/m) {
+            /^\s*# FRAGMENT id=bash-completion-prog-hints completer=1 for=(.+?)\s*$/m
+                && $content !~ /^\s*# FRAGMENT id=bash-completion-prog-nohint\s*$/m) {
         return [200, "OK", 1, {
             "func.command"=>join(
                 "; ",
