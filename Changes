@@ -1,5 +1,12 @@
 Revision history for App-BashCompletionProg
 
+0.04    2014-12-03 (PERLANCAR)
+
+	- Add '# FRAGMENT id=bash-completion-prog-nohint' to protect
+	  bash-completion-prog itself from having its # FRAGMENT in POD
+	  interpreted.
+
+
 0.03    2014-11-17 (PERLANCAR)
 
 	- Skip backup files in PATH.
